@@ -114,7 +114,7 @@ Q_table.shape
 def discretizer( pos , velocity , angle, pole_velocity ) -> Tuple[int,...]:
     est = KBinsDiscretizer(n_bins=n_bins, encode='ordinal', strategy='uniform')
     est.fit([lower_bounds, upper_bounds ])
-    return tuple(map(int,est.transform([[angle, pole_velocity]])[0]))
+    return tuple(map(int,est.transform([[angle, pole_velocity]])[0])) #Para adicionar os outros estados deve-se mapear a velocidade e a posição
 
 def new_Q_value( reward : float ,  new_state : tuple , discount_factor=1 ) -> float:
     future_optimal_value = np.max(Q_table[new_state])
@@ -141,16 +141,14 @@ def main():
         current_state, done = discretizer(*env.reset()), False
         sun_reward = 0
         while done==False:
-
+            #Para ações aleátorias tire o aprendizado ou fixar a exploration rate em 1 
             action = policy(current_state) # exploit
 
-            if np.random.random() < exploration_rate(e) : 
+            if np.random.random() < exploration_rate(e) : #Para fixar a taxa de exploração basta inserir o numero no lugar de  exploration_rate(e)
                 action = env.action_space.sample() # explore 
-
             obs, reward, done, _ = env.step(action)
             new_state = discretizer(*obs)
             sun_reward = sun_reward + reward 
-
             lr = learning_rate(e)
             learnt_value = new_Q_value(reward , new_state )
             old_value = Q_table[current_state][action]
