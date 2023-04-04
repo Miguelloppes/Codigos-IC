@@ -13,6 +13,7 @@ try:
     import tensorflow.compat.v1 as tf
     tf.disable_v2_behavior() 
     from collections import deque
+    from openpyxl.reader.excel import load_workbook
 except ImportError:
     sys.exit(
         'Please make sure you have all dependencies installed. '
@@ -24,6 +25,7 @@ class OpenAIGymEnvironment(Supervisor, gym.Env):
     def __init__(self, max_episode_steps=1000):
         super().__init__()
 
+        # Open AI Gym generic
         self.theta_threshold_radians = 0.2
         self.x_threshold = 0.3
         high = np.array(
@@ -40,10 +42,12 @@ class OpenAIGymEnvironment(Supervisor, gym.Env):
         self.state = None
         self.spec = gym.envs.registration.EnvSpec(id='WebotsEnv-v0', max_episode_steps=max_episode_steps)
 
+        # Environment specific
         self.__timestep = int(self.getBasicTimeStep())
         self.__wheels = []
         self.__pendulum_sensor = None
 
+        # Tools
         self.keyboard = self.getKeyboard()
         self.keyboard.enable(self.__timestep)
 
@@ -52,11 +56,12 @@ class OpenAIGymEnvironment(Supervisor, gym.Env):
             super().step(self.__timestep)
 
     def reset(self):
+        # Reset the simulation
         self.simulationResetPhysics()
         self.simulationReset()
         super().step(self.__timestep)
 
-        
+        # Motors
         self.__wheels = []
         for name in ['back left wheel', 'back right wheel', 'front left wheel', 'front right wheel']:
             wheel = self.getDevice(name)
@@ -64,29 +69,29 @@ class OpenAIGymEnvironment(Supervisor, gym.Env):
             wheel.setVelocity(0)
             self.__wheels.append(wheel)
 
-        
+        # Sensors
         self.__pendulum_sensor = self.getDevice('position sensor')
         self.__pendulum_sensor.enable(self.__timestep)
 
-        
+        # Internals
         super().step(self.__timestep)
 
-        
+        # Open AI Gym generic
         return np.array([0, 0, 0, 0]).astype(np.float32)
 
     def step(self, action):
-        
+        # Execute the action
         for wheel in self.__wheels:
             wheel.setVelocity(1.3 if action == 1 else -1.3)
         super().step(self.__timestep)
 
-        
+        # Observation
         robot = self.getSelf()
         endpoint = self.getFromDef("POLE_ENDPOINT")
         self.state = np.array([robot.getPosition()[2], robot.getVelocity()[2],
                                self.__pendulum_sensor.getValue(), endpoint.getVelocity()[3]])
 
-        
+        # Done
         done = bool(
             self.state[0] < -self.x_threshold or
             self.state[0] > self.x_threshold or
@@ -142,24 +147,29 @@ Q_table = np.zeros(n_bins + (env.action_space.n,))
 Q_table.shape  
 
 def discretizer( pos , velocity , angle, pole_velocity ) -> Tuple[int,...]:
+    """Convert continues state intro a discrete state"""
     est = KBinsDiscretizer(n_bins=n_bins, encode='ordinal', strategy='uniform')
     est.fit([lower_bounds, upper_bounds ])
     return tuple(map(int,est.transform([[angle, pole_velocity]])[0]))
 
 def new_Q_value( reward : float ,  new_state : tuple , discount_factor=1 ) -> float:
+    """Temperal diffrence for updating Q-value of state-action pair"""
     future_optimal_value = np.max(Q_table[new_state])
     learned_value = reward + discount_factor * future_optimal_value
     return learned_value
     
     
 def policy( state : tuple ):
+    """Choosing action based on epsilon-greedy policy"""
     return np.argmax(Q_table[state])
 
-def learning_rate(n : int , min_rate=0.01 ) -> float  :
+def learning_rate(n : int , min_rate=0.1 ) -> float  :
+    """Decaying learning rate"""
     return max(min_rate, min(1.0, 1.0 - math.log10((n + 1) / 25)))
 
 def exploration_rate(n : int, min_rate= 0.1 ) -> float :
-   return max(min_rate, min(1, 1.0 - math.log10((n  + 1) / 25)))
+    """Decaying exploration rate"""
+    return max(min_rate, min(1, 1.0 - math.log10((n  + 1) / 25)))
     
 class DQNAgent():
     def __init__(self, env):
@@ -213,7 +223,7 @@ def main():
             state = next_state
             
             
-           
+            # Render the cartpole environment 
         fileq = open("reward.txt", "a")
         for s in range(1):
             fileq.write("%d\n" % (total_reward ))   
